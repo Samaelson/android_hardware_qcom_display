@@ -40,6 +40,37 @@ using namespace overlay;
 using namespace overlay::utils;
 namespace qhwc {
 
+//Opens writeback framebuffer and returns fd.
+static int openWbFb() {
+    int wbFd = -1;
+    //Check opening which FB would connect LM to WB
+    const int wbFbNum = Overlay::getFbForDpy(Overlay::DPY_WRITEBACK);
+    if(wbFbNum >= 0) {
+        char wbFbPath[256];
+        snprintf (wbFbPath, sizeof(wbFbPath),
+                "/sys/class/graphics/fb%d", wbFbNum);
+        //Opening writeback fb first time would create ad node if the device
+        //supports adaptive display
+        wbFd = open(wbFbPath, O_RDONLY);
+        if(wbFd < 0) {
+            ALOGE("%s: Failed to open /sys/class/graphics/fb%d with error %s",
+                    __func__, wbFbNum, strerror(errno));
+        }
+    } else {
+        ALOGD_IF(DEBUG, "%s: No writeback available", __func__);
+    }
+    return wbFd;
+}
+
+static inline void closeWbFb(int& fd) {
+    if(fd >= 0) {
+        close(fd);
+        fd = -1;
+    } else {
+        ALOGE("%s: Invalid fd %d", __func__, fd);
+    }
+}
+
 //Helper to write data to ad node
 static void adWrite(const int& value) {
     const int wbFbNum = Overlay::getFbForDpy(Overlay::DPY_WRITEBACK);
@@ -92,31 +123,18 @@ static int adRead() {
     return ret;
 }
 
-AssertiveDisplay::AssertiveDisplay(hwc_context_t *ctx) :
-     mTurnedOff(true), mFeatureEnabled(false),
-     mDest(overlay::utils::OV_INVALID)
-{
-    //Values in ad node:
-    //-1 means feature is disabled on device
-    // 0 means feature exists but turned off, will be turned on by hwc
-    // 1 means feature is turned on by hwc
-    // Plus, we do this feature only on split primary displays.
-    // Plus, we do this feature only if ro.qcom.ad=2
-
-    char property[PROPERTY_VALUE_MAX];
-    const int ENABLED = 2;
-    int val = 0;
-
-    if(property_get("ro.qcom.ad", property, "0") > 0) {
-        val = atoi(property);
-    }
-
-    if(adRead() >= 0 && isDisplaySplit(ctx, HWC_DISPLAY_PRIMARY) &&
-            val == ENABLED) {
-        ALOGD_IF(DEBUG, "Assertive display feature supported");
-        mFeatureEnabled = true;
-        // If feature exists but is turned off, set mTurnedOff to true
-        mTurnedOff = adRead() > 0 ? false : true;
+AssertiveDisplay::AssertiveDisplay() :mWbFd(-1), mDoable(false),
+        mFeatureEnabled(false), mDest(overlay::utils::OV_INVALID) {
+    int fd = openWbFb();
+    if(fd >= 0) {
+        //-1 means feature is disabled on device
+        // 0 means feature exists but turned off, will be turned on by hwc
+        // 1 means feature is turned on by hwc
+        if(adRead() >= 0) {
+            ALOGD_IF(DEBUG, "Assertive display feature supported");
+            mFeatureEnabled = true;
+        }
+        closeWbFb(fd);
     }
 }
 
@@ -135,30 +153,22 @@ void AssertiveDisplay::markDoable(hwc_context_t *ctx,
     }
 }
 
-void AssertiveDisplay::turnOffAD() {
-    if(mFeatureEnabled) {
-        if(!mTurnedOff) {
-            const int off = 0;
-            adWrite(off);
-            mTurnedOff = true;
-        }
-    }
-    mDoable = false;
-}
-
 bool AssertiveDisplay::prepare(hwc_context_t *ctx,
         const hwc_rect_t& crop,
         const Whf& whf,
         const private_handle_t *hnd) {
     if(!isDoable()) {
-        //Cleanup one time during this switch
-        turnOffAD();
+        if(isModeOn()) {
+            //Cleanup one time during this switch
+            const int off = 0;
+            adWrite(off);
+            closeWbFb(mWbFd);
+        }
         return false;
     }
 
     ovutils::eDest dest = ctx->mOverlay->nextPipe(ovutils::OV_MDP_PIPE_VG,
-            overlay::Overlay::DPY_WRITEBACK, Overlay::MIXER_DEFAULT,
-            Overlay::FORMAT_YUV);
+            overlay::Overlay::DPY_WRITEBACK, Overlay::MIXER_DEFAULT);
     if(dest == OV_INVALID) {
         ALOGE("%s failed: No VG pipe available", __func__);
         mDoable = false;
@@ -166,14 +176,6 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     }
 
     overlay::Writeback *wb = overlay::Writeback::getInstance();
-
-    //Set Security flag on writeback
-    if(isSecureBuffer(hnd)) {
-        if(!wb->setSecure(isSecureBuffer(hnd))) {
-            ALOGE("Failure in setting WB secure flag for ad");
-            return false;
-        }
-    }
 
     if(!wb->configureDpyInfo(hnd->width, hnd->height)) {
         ALOGE("%s: config display failed", __func__);
@@ -192,7 +194,7 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     size = getBufferSizeAndDimensions(hnd->width, hnd->height,
                 format, tmpW, tmpH);
 
-    if(!wb->configureMemory(size)) {
+    if(!wb->configureMemory(size, isSecureBuffer(hnd))) {
         ALOGE("%s: config memory failed", __func__);
         mDoable = false;
         return false;
@@ -205,7 +207,9 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     }
 
     PipeArgs parg(mdpFlags, whf, ZORDER_0, IS_FG_OFF,
-            ROT_FLAGS_NONE);
+            ROT_FLAGS_NONE,
+            ovutils::DEFAULT_PLANE_ALPHA,
+            ovutils::OVERLAY_BLENDING_OPAQUE);
     hwc_rect_t dst = crop; //input same as output
 
     if(configMdp(ctx->mOverlay, parg, OVERLAY_TRANSFORM_0, crop, dst, NULL,
@@ -216,30 +220,19 @@ bool AssertiveDisplay::prepare(hwc_context_t *ctx,
     }
 
     mDest = dest;
-    int wbFd = wb->getFbFd();
-    if(mFeatureEnabled && wbFd >= 0 &&
-        !ctx->mOverlay->validateAndSet(overlay::Overlay::DPY_WRITEBACK, wbFd))
-    {
-        ALOGE("%s: Failed to validate and set overlay for dpy %d"
-                ,__FUNCTION__, overlay::Overlay::DPY_WRITEBACK);
-        turnOffAD();
-        return false;
+    if(!isModeOn()) {
+        mWbFd = openWbFb();
+        if(mWbFd >= 0) {
+            //write to sysfs, one time during this switch
+            const int on = 1;
+            adWrite(on);
+        }
     }
-
-    // Only turn on AD if there are no errors during configuration stage
-    // and if it was previously in OFF state.
-    if(mFeatureEnabled && mTurnedOff) {
-        //write to sysfs, one time during this switch
-        const int on = 1;
-        adWrite(on);
-        mTurnedOff = false;
-    }
-
     return true;
 }
 
 bool AssertiveDisplay::draw(hwc_context_t *ctx, int fd, uint32_t offset) {
-    if(!isDoable()) {
+    if(!isDoable() || !isModeOn()) {
         return false;
     }
 
@@ -256,12 +249,12 @@ bool AssertiveDisplay::draw(hwc_context_t *ctx, int fd, uint32_t offset) {
     return true;
 }
 
-int AssertiveDisplay::getDstFd(hwc_context_t * /*ctx*/) const {
+int AssertiveDisplay::getDstFd(hwc_context_t *ctx) const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getDstFd();
 }
 
-uint32_t AssertiveDisplay::getDstOffset(hwc_context_t * /*ctx*/) const {
+uint32_t AssertiveDisplay::getDstOffset(hwc_context_t *ctx) const {
     overlay::Writeback *wb = overlay::Writeback::getInstance();
     return wb->getOffset();
 }

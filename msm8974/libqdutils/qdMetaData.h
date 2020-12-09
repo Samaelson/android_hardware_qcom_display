@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -31,24 +31,12 @@
 #define _QDMETADATA_H
 
 #define MAX_IGC_LUT_ENTRIES 256
-#define MAX_VFM_DATA_SIZE   64 //bytes per data buffer
-#define MAX_VFM_DATA_COUNT  16 //number of data buffers
 
-/* This macro finds the index corresponding to a type */
-/* This is equivalent to indx = LOG_2(type) */
-inline int32_t getVfmDataIdx(int32_t type){
-    int32_t indx = 0, x = type;
-    while( x >> 1) {
-        x = (x >> 1);
-        indx++;
-    }
-    return indx;
-}
-enum ColorSpace_t{
+typedef enum {
     ITU_R_601,
     ITU_R_601_FR,
     ITU_R_709,
-};
+} ColorSpace_t;
 
 struct HSICData_t {
     int32_t hue;
@@ -75,24 +63,17 @@ struct BufferDim_t {
     int32_t sliceHeight;
 };
 
-struct VfmData_t {
-    int32_t dataType;
-    char    data[MAX_VFM_DATA_SIZE];
-};
-
 struct MetaData_t {
     int32_t operation;
     int32_t interlaced;
-    struct BufferDim_t bufferDim;
-    struct HSICData_t hsicData;
+    BufferDim_t bufferDim;
+    HSICData_t hsicData;
     int32_t sharpness;
     int32_t video_interface;
-    struct IGCData_t igcData;
-    struct Sharp2Data_t Sharp2Data;
+    IGCData_t igcData;
+    Sharp2Data_t Sharp2Data;
     int64_t timestamp;
-    int32_t vfmDataBitMap;
-    struct VfmData_t vfmData[MAX_VFM_DATA_COUNT];
-    uint32_t refreshrate;
+    ColorSpace_t colorSpace;
 };
 
 typedef enum {
@@ -104,8 +85,7 @@ typedef enum {
     PP_PARAM_SHARP2     = 0x0020,
     PP_PARAM_TIMESTAMP  = 0x0040,
     UPDATE_BUFFER_GEOMETRY = 0x0080,
-    PP_PARAM_VFM_DATA   = 0x0100,
-    UPDATE_REFRESH_RATE = 0x0200,
+    UPDATE_COLOR_SPACE = 0x0100,
 } DispParamType;
 
 int setMetaData(private_handle_t *handle, DispParamType paramType, void *param);

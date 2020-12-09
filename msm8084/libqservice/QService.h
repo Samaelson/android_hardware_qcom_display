@@ -32,7 +32,7 @@
 
 #include <utils/Errors.h>
 #include <sys/types.h>
-#include <log/log.h>
+#include <cutils/log.h>
 #include <binder/IServiceManager.h>
 #include <IQService.h>
 #include <IQClient.h>

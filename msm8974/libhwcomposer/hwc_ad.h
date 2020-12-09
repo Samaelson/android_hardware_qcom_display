@@ -39,7 +39,7 @@ namespace qhwc {
 
 class AssertiveDisplay {
 public:
-    AssertiveDisplay(hwc_context_t *ctx);
+    AssertiveDisplay();
     void markDoable(hwc_context_t *ctx, const hwc_display_contents_1_t* list);
     bool prepare(hwc_context_t *ctx, const hwc_rect_t& crop,
             const overlay::utils::Whf& whf,
@@ -50,16 +50,17 @@ public:
             mDest = overlay::utils::OV_INVALID;
     }
     bool isDoable() const { return mDoable; }
+    bool isModeOn() const { return (mWbFd >= 0); }
     int getDstFd(hwc_context_t *ctx) const;
     uint32_t getDstOffset(hwc_context_t *ctx) const;
 
 private:
+    //State of feature turned on and off
+    int mWbFd;
     bool mDoable;
-    bool mTurnedOff;
     //State of feature existence on certain devices and configs.
     bool mFeatureEnabled;
     overlay::utils::eDest mDest;
-    void turnOffAD();
 };
 
 }

@@ -15,9 +15,6 @@
  */
 
 #include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <log/log.h>
 
 #include <hardware/memtrack.h>
 
@@ -25,8 +22,6 @@
 
 int msm_memtrack_init(const struct memtrack_module *module)
 {
-    if(!module)
-        return -1;
     return 0;
 }
 
@@ -36,8 +31,6 @@ int msm_memtrack_get_memory(const struct memtrack_module *module,
                                 struct memtrack_record *records,
                                 size_t *num_records)
 {
-    if(!module)
-        return -1;
     if (type == MEMTRACK_TYPE_GL || type == MEMTRACK_TYPE_GRAPHICS) {
         return kgsl_memtrack_get_memory(pid, type, records, num_records);
     }
@@ -45,52 +38,22 @@ int msm_memtrack_get_memory(const struct memtrack_module *module,
     return -EINVAL;
 }
 
-static int memtrack_open(__attribute__((unused)) const hw_module_t* module, const char* name,
-                    hw_device_t** device)
-{
-    ALOGD("%s: enter; name=%s", __FUNCTION__, name);
-    int retval = 0; /* 0 is ok; -1 is error */
-
-    if (strcmp(name, "memtrack") == 0) {
-        struct memtrack_module *dev = (struct memtrack_module *)calloc(1,
-                sizeof(struct memtrack_module));
-
-        if (dev) {
-            /* Common hw_device_t fields */
-            dev->common.tag = HARDWARE_DEVICE_TAG;
-            dev->common.module_api_version = MEMTRACK_MODULE_API_VERSION_0_1;
-            dev->common.hal_api_version = HARDWARE_HAL_API_VERSION;
-
-            dev->init = msm_memtrack_init;
-            dev->getMemory = msm_memtrack_get_memory;
-
-            *device = (hw_device_t*)dev;
-        } else
-            retval = -ENOMEM;
-    } else {
-        retval = -EINVAL;
-    }
-
-    ALOGD("%s: exit %d", __FUNCTION__, retval);
-    return retval;
-}
-
 static struct hw_module_methods_t memtrack_module_methods = {
-    .open = memtrack_open,
+    .open = NULL,
 };
 
 struct memtrack_module HAL_MODULE_INFO_SYM = {
-    .common = {
-        .tag = HARDWARE_MODULE_TAG,
-        .module_api_version = MEMTRACK_MODULE_API_VERSION_0_1,
-        .hal_api_version = HARDWARE_HAL_API_VERSION,
-        .id = MEMTRACK_HARDWARE_MODULE_ID,
-        .name = "MSM Memory Tracker HAL",
-        .author = "The Android Open Source Project",
-        .methods = &memtrack_module_methods,
+    common: {
+        tag: HARDWARE_MODULE_TAG,
+        module_api_version: MEMTRACK_MODULE_API_VERSION_0_1,
+        hal_api_version: HARDWARE_HAL_API_VERSION,
+        id: MEMTRACK_HARDWARE_MODULE_ID,
+        name: "MSM Memory Tracker HAL",
+        author: "The Android Open Source Project",
+        methods: &memtrack_module_methods,
     },
 
-    .init = msm_memtrack_init,
-    .getMemory = msm_memtrack_get_memory,
+    init: msm_memtrack_init,
+    getMemory: msm_memtrack_get_memory,
 };
 

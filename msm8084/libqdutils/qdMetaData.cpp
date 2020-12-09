@@ -29,7 +29,7 @@
 
 #include <string.h>
 #include <sys/mman.h>
-#include <log/log.h>
+#include <cutils/log.h>
 #include <gralloc_priv.h>
 #include <inttypes.h>
 #include "qdMetaData.h"

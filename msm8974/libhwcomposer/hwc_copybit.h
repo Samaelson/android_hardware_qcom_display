@@ -22,17 +22,12 @@
 #include "hwc_utils.h"
 
 #define NUM_RENDER_BUFFERS 3
-//These scaling factors are specific for MDP3. Normally scaling factor
-//is only 4, but copybit will create temp buffer to let it run through
-//twice
-#define MAX_SCALE_FACTOR 16
-#define MIN_SCALE_FACTOR 0.0625
-#define MAX_LAYERS_FOR_ABC 2
+
 namespace qhwc {
 
 class CopyBit {
 public:
-    CopyBit(hwc_context_t *ctx, const int& dpy);
+    CopyBit();
     ~CopyBit();
     // API to get copybit engine(non static)
     struct copybit_device_t *getCopyBitDevice();
@@ -48,50 +43,13 @@ public:
     private_handle_t * getCurrentRenderBuffer();
 
     void setReleaseFd(int fd);
-    void setReleaseFdSync(int fd);
-
-    bool prepareOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list);
-
-    int drawOverlap(hwc_context_t *ctx, hwc_display_contents_1_t *list);
-
-
 
 private:
-    /* cached data */
-    struct LayerCache {
-      int layerCount;
-      buffer_handle_t hnd[MAX_NUM_APP_LAYERS];
-      /* c'tor */
-      LayerCache();
-      /* clear caching info*/
-      void reset();
-      void updateCounts(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-              int dpy);
-    };
-    /* framebuffer cache*/
-    struct FbCache {
-      hwc_rect_t  FbdirtyRect[NUM_RENDER_BUFFERS];
-      int FbIndex;
-      FbCache();
-      void reset();
-      void insertAndUpdateFbCache(hwc_rect_t dirtyRect);
-      int getUnchangedFbDRCount(hwc_rect_t dirtyRect);
-    };
-
     // holds the copybit device
     struct copybit_device_t *mEngine;
-    bool drawUsingAppBufferComposition(hwc_context_t *ctx,
-                                hwc_display_contents_1_t *list,
-                                int dpy, int *fd);
     // Helper functions for copybit composition
     int  drawLayerUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
                           private_handle_t *renderBuffer, int dpy, bool isFG);
-    // Helper function to draw copybit layer for PTOR comp
-    int drawRectUsingCopybit(hwc_context_t *dev, hwc_layer_1_t *layer,
-                          private_handle_t *renderBuffer, hwc_rect_t overlap,
-                          hwc_rect_t destRect);
-    int fillColorUsingCopybit(hwc_layer_1_t *layer,
-                          private_handle_t *renderBuffer);
     bool canUseCopybitForYUV (hwc_context_t *ctx);
     bool canUseCopybitForRGB (hwc_context_t *ctx,
                                      hwc_display_contents_1_t *list, int dpy);
@@ -119,24 +77,12 @@ private:
     // Index of the current intermediate render buffer
     int mCurRenderBufferIndex;
 
-    // Release FDs of the intermediate render buffer
-    int mRelFd[NUM_RENDER_BUFFERS];
+    //These are the the release FDs of the T-2 and T-1 round
+    //We wait on the T-2 fence
+    int mRelFd[2];
 
     //Dynamic composition threshold for deciding copybit usage.
     double mDynThreshold;
-    int mAlignedWidth;
-    int mAlignedHeight;
-    bool mSwapRectEnable;
-    int mAlignedFBWidth;
-    int mAlignedFBHeight;
-    int mDirtyLayerIndex;
-    hwc_rect_t mDirtyRect;
-    LayerCache mLayerCache;
-    FbCache mFbCache;
-    int getLayersChanging(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-                  int dpy);
-    int checkDirtyRect(hwc_context_t *ctx, hwc_display_contents_1_t *list,
-                  int dpy);
 };
 
 }; //namespace qhwc

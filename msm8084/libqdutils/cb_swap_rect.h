@@ -31,7 +31,7 @@
 
 #include <stdint.h>
 #include <utils/Singleton.h>
-#include <log/log.h>
+#include <cutils/log.h>
 
 using namespace android;
 namespace qdutils {

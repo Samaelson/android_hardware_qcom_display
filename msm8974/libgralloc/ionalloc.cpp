@@ -30,12 +30,11 @@
 #define DEBUG 0
 #include <linux/ioctl.h>
 #include <sys/mman.h>
+#include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <cutils/log.h>
 #include <errno.h>
-#include <string.h>
-
 #include "gralloc_priv.h"
 #include "ionalloc.h"
 
@@ -75,8 +74,13 @@ int IonAlloc::alloc_buffer(alloc_data& data)
 
     ionAllocData.len = data.size;
     ionAllocData.align = data.align;
-    ionAllocData.heap_mask = data.flags & ~ION_SECURE;
+    ionAllocData.heap_id_mask = data.flags & ~ION_SECURE;
     ionAllocData.flags = data.uncached ? 0 : ION_FLAG_CACHED;
+    // ToDo: replace usage of alloc data structure with
+    //  ionallocdata structure.
+    if (data.flags & ION_SECURE)
+        ionAllocData.flags |= ION_SECURE;
+
     // ToDo: replace usage of alloc data structure with
     //  ionallocdata structure.
     if (data.flags & ION_SECURE)
@@ -179,7 +183,6 @@ int IonAlloc::clean_buffer(void *base, size_t size, int offset, int fd, int op)
     struct ion_flush_data flush_data;
     struct ion_fd_data fd_data;
     struct ion_handle_data handle_data;
-    ion_user_handle_t handle;
     int err = 0;
 
     err = open_device();

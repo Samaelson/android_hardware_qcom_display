@@ -30,7 +30,7 @@
 #ifndef INCLUDE_IDLEINVALIDATOR
 #define INCLUDE_IDLEINVALIDATOR
 
-#include <log/log.h>
+#include <cutils/log.h>
 #include <utils/threads.h>
 #include <gr.h>
 

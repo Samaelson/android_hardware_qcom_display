@@ -45,7 +45,7 @@
 #include <utils/Log.h>
 #include "gralloc_priv.h" //for interlace
 
-// Older platforms do not support Venus
+// Older platforms do not support Venus.
 #ifndef VENUS_COLOR_FORMAT
 #define MDP_Y_CBCR_H2V2_VENUS MDP_IMGTYPE_LIMIT
 #endif
@@ -75,10 +75,6 @@
 
 #ifndef MDP_OV_PIPE_FORCE_DMA
 #define MDP_OV_PIPE_FORCE_DMA 0x4000
-#endif
-
-#ifndef MDSS_MDP_DUAL_PIPE
-#define MDSS_MDP_DUAL_PIPE 0x200
 #endif
 
 #define FB_DEVICE_TEMPLATE "/dev/graphics/fb%u"
@@ -261,17 +257,14 @@ enum eMdpFlags {
     OV_MDP_PIPE_FORCE_DMA = MDP_OV_PIPE_FORCE_DMA,
     OV_MDP_DEINTERLACE = MDP_DEINTERLACE,
     OV_MDP_SECURE_OVERLAY_SESSION = MDP_SECURE_OVERLAY_SESSION,
-    OV_MDP_SECURE_DISPLAY_OVERLAY_SESSION = MDP_SECURE_DISPLAY_OVERLAY_SESSION,
     OV_MDP_SOURCE_ROTATED_90 = MDP_SOURCE_ROTATED_90,
+    OV_MDP_BACKEND_COMPOSITION = MDP_BACKEND_COMPOSITION,
     OV_MDP_BLEND_FG_PREMULT = MDP_BLEND_FG_PREMULT,
     OV_MDP_FLIP_H = MDP_FLIP_LR,
     OV_MDP_FLIP_V = MDP_FLIP_UD,
     OV_MDSS_MDP_RIGHT_MIXER = MDSS_MDP_RIGHT_MIXER,
     OV_MDP_PP_EN = MDP_OVERLAY_PP_CFG_EN,
     OV_MDSS_MDP_BWC_EN = MDP_BWC_EN,
-    OV_MDSS_MDP_DUAL_PIPE = MDSS_MDP_DUAL_PIPE,
-    OV_MDP_SOLID_FILL = MDP_SOLID_FILL,
-    OV_MDP_SMP_FORCE_ALLOC = MDP_SMP_FORCE_ALLOC,
 };
 
 enum eZorder {
@@ -360,7 +353,7 @@ struct PipeArgs {
 
     PipeArgs(eMdpFlags f, Whf _whf,
             eZorder z, eIsFg fg, eRotFlags r,
-            int pA = DEFAULT_PLANE_ALPHA, eBlending b = OVERLAY_BLENDING_COVERAGE) :
+            int pA, eBlending b) :
         mdpFlags(f),
         whf(_whf),
         zorder(z),
@@ -412,8 +405,8 @@ int getHALFormat(int mdpFormat);
 int getDownscaleFactor(const int& src_w, const int& src_h,
         const int& dst_w, const int& dst_h);
 void getDecimationFactor(const int& src_w, const int& src_h,
-        const int& dst_w, const int& dst_h, float& horDscale,
-        float& verDscale);
+        const int& dst_w, const int& dst_h, uint8_t& horzDeci,
+        uint8_t& vertDeci);
 
 /* flip is upside down and such. V, H flip
  * rotation is 90, 180 etc
@@ -422,7 +415,7 @@ int getMdpOrient(eTransform rotation);
 const char* getFormatString(int format);
 
 template <class T>
-inline void memset0(T& t) { ::memset(&t, 0, sizeof(t)); }
+inline void memset0(T& t) { ::memset(&t, 0, sizeof(T)); }
 
 template <class T> inline void swap ( T& a, T& b )
 {
@@ -490,8 +483,6 @@ inline bool isYuv(uint32_t format) {
         case MDP_Y_CR_CB_H2V2:
         case MDP_Y_CR_CB_GH2V2:
         case MDP_Y_CBCR_H2V2_VENUS:
-        case MDP_YCBYCR_H2V1:
-        case MDP_YCRYCB_H2V1:
             return true;
         default:
             return false;
@@ -522,7 +513,6 @@ inline const char* getFormatString(int format){
     formats[MDP_ARGB_8888] = STR(MDP_ARGB_8888);
     formats[MDP_RGB_888] = STR(MDP_RGB_888);
     formats[MDP_Y_CRCB_H2V2] = STR(MDP_Y_CRCB_H2V2);
-    formats[MDP_YCBYCR_H2V1] = STR(MDP_YCBYCR_H2V1);
     formats[MDP_YCRYCB_H2V1] = STR(MDP_YCRYCB_H2V1);
     formats[MDP_CBYCRY_H2V1] = STR(MDP_CBYCRY_H2V1);
     formats[MDP_Y_CRCB_H2V1] = STR(MDP_Y_CRCB_H2V1);
@@ -696,14 +686,6 @@ inline void even_floor(T& value) {
         value--;
 }
 
-/* Prerotation adjusts crop co-ordinates to the new transformed values within
- * destination buffer. This is necessary only when the entire buffer is rotated
- * irrespective of crop (A-family). If only the crop portion of the buffer is
- * rotated into a destination buffer matching the size of crop, we don't need to
- * use this helper (B-family).
- * @Deprecated as of now, retained for the case where a full buffer needs
- * transform and also as a reference.
- */
 void preRotateSource(const eTransform& tr, Whf& whf, Dim& srcCrop);
 void getDump(char *buf, size_t len, const char *prefix, const mdp_overlay& ov);
 void getDump(char *buf, size_t len, const char *prefix, const msmfb_img& ov);
@@ -814,7 +796,7 @@ inline bool OvFD::open(const char* const dev, int flags)
 
 inline void OvFD::setPath(const char* const dev)
 {
-    ::strlcpy(mPath, dev, sizeof(mPath));
+    ::strncpy(mPath, dev, utils::MAX_PATH_LEN);
 }
 
 inline bool OvFD::close()

@@ -33,7 +33,7 @@
 #include <stdio.h>
 #include <utils/Singleton.h>
 #include <cutils/properties.h>
-#include <log/log.h>
+#include <cutils/log.h>
 
 #ifndef DEBUG_CALC_FPS
 #define CALC_FPS() ((void)0)

@@ -27,7 +27,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <log/log.h>
+#include <cutils/log.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include "gralloc_priv.h"

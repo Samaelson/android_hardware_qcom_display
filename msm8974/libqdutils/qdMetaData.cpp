@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -27,7 +27,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <cutils/log.h>
@@ -51,8 +50,8 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
     unsigned long size = ROUND_UP_PAGESIZE(sizeof(MetaData_t));
     void *base = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED,
         handle->fd_metadata, 0);
-    if (base == reinterpret_cast<void*>(MAP_FAILED)) {
-        ALOGE("%s: mmap() failed: error is %s!", __func__, strerror(errno));
+    if (!base) {
+        ALOGE("%s: mmap() failed: Base addr is NULL!", __func__);
         return -1;
     }
     MetaData_t *data = reinterpret_cast <MetaData_t *>(base);
@@ -82,29 +81,9 @@ int setMetaData(private_handle_t *handle, DispParamType paramType,
         case UPDATE_BUFFER_GEOMETRY:
             memcpy((void *)&data->bufferDim, param, sizeof(BufferDim_t));
             break;
-        case UPDATE_REFRESH_RATE:
-            data->refreshrate = *((uint32_t *)param);
+        case UPDATE_COLOR_SPACE:
+            data->colorSpace = *((ColorSpace_t *)param);
             break;
-        case PP_PARAM_VFM_DATA:
-        {
-            int32_t     indx = 0;
-            VfmData_t*  pVfmData = reinterpret_cast <VfmData_t *>(param);
-            int32_t     dataType = pVfmData->dataType;
-
-            if(dataType > 0){
-                indx = getVfmDataIdx(dataType);
-                if(indx < MAX_VFM_DATA_COUNT){
-                    data->vfmDataBitMap |= dataType;
-                    memcpy((void *)&data->vfmData[indx], param,
-                        sizeof(VfmData_t));
-                }else{
-                    ALOGE("unknown dataType %d", dataType);
-                }
-            }else{
-                ALOGE("invalid dataType in PP_PARAM_VFM_DATA %d", dataType);
-            }
-        }
-        break;
         default:
             ALOGE("Unknown paramType %d", paramType);
             break;

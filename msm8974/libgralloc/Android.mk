@@ -17,20 +17,20 @@ LOCAL_PATH := $(call my-dir)
 include $(LOCAL_PATH)/../common.mk
 include $(CLEAR_VARS)
 
+# gralloc.cpp:87  use of GNU old-style field designator extension.
+LOCAL_CLANG_CFLAGS            += -Wno-gnu-designator
+
 LOCAL_MODULE                  := gralloc.$(TARGET_BOARD_PLATFORM)
-LOCAL_MODULE_RELATIVE_PATH    := hw
-LOCAL_VENDOR_MODULE           := true
+LOCAL_MODULE_PATH             := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS             := optional
+LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libmemalloc
 LOCAL_SHARED_LIBRARIES        += libqdutils libGLESv1_CM
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\" -Wno-sign-conversion
-LOCAL_CLANG                   := true
-LOCAL_HEADER_LIBRARIES        := display_headers generated_kernel_headers
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdgralloc\"
+LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := gpu.cpp gralloc.cpp framebuffer.cpp mapper.cpp
-
-ifeq ($(TARGET_USE_COMPAT_GRALLOC_PERFORM),true)
-LOCAL_CFLAGS += -DGRALLOC_PERFORM_COMPAT
-endif
+LOCAL_COPY_HEADERS_TO         := $(common_header_export_path)
+LOCAL_COPY_HEADERS            := gralloc_priv.h
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -38,12 +38,11 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE                  := libmemalloc
-LOCAL_VENDOR_MODULE           := true
 LOCAL_MODULE_TAGS             := optional
+LOCAL_C_INCLUDES              := $(common_includes) $(kernel_includes)
 LOCAL_SHARED_LIBRARIES        := $(common_libs) libqdutils libdl
-LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdmemalloc\" -Wno-sign-conversion
-LOCAL_CLANG                   := true
-LOCAL_HEADER_LIBRARIES        := display_headers generated_kernel_headers
+LOCAL_CFLAGS                  := $(common_flags) -DLOG_TAG=\"qdmemalloc\"
+LOCAL_ADDITIONAL_DEPENDENCIES := $(common_deps) $(kernel_deps)
 LOCAL_SRC_FILES               := ionalloc.cpp alloc_controller.cpp
 
 include $(BUILD_SHARED_LIBRARY)

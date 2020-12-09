@@ -17,7 +17,7 @@
 
 #include <sys/mman.h>
 
-#include <log/log.h>
+#include <cutils/log.h>
 #include <cutils/properties.h>
 #include <dlfcn.h>
 

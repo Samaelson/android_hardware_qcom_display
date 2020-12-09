@@ -18,7 +18,7 @@
 
 // #define LOG_NDEBUG 0
 
-#include <log/log.h>
+#include <cutils/log.h>
 
 #include <stdint.h>
 #include <string.h>
